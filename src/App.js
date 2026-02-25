@@ -29,6 +29,199 @@ const parseProperties = (content) => {
   return parsed;
 };
 
+const evaluateExpression = (expression) => {
+  const trimmed = expression.trim();
+
+  if (trimmed === '') {
+    return NaN;
+  }
+
+  const tokens = [];
+  let index = 0;
+
+  while (index < trimmed.length) {
+    const char = trimmed[index];
+
+    if (char === ' ' || char === '\t' || char === '\n') {
+      index += 1;
+      continue;
+    }
+
+    if (char >= '0' && char <= '9' || char === '.') {
+      let numberText = '';
+      let dotCount = 0;
+
+      while (index < trimmed.length) {
+        const current = trimmed[index];
+
+        if (current === '.') {
+          dotCount += 1;
+          if (dotCount > 1) {
+            return NaN;
+          }
+          numberText += current;
+          index += 1;
+          continue;
+        }
+
+        if (current >= '0' && current <= '9') {
+          numberText += current;
+          index += 1;
+          continue;
+        }
+
+        break;
+      }
+
+      if (numberText === '.' || numberText === '') {
+        return NaN;
+      }
+
+      tokens.push({ type: 'number', value: Number(numberText) });
+      continue;
+    }
+
+    if ('+-*/()'.includes(char)) {
+      if (char === '(' || char === ')') {
+        tokens.push({ type: 'paren', value: char });
+      } else {
+        tokens.push({ type: 'operator', value: char });
+      }
+      index += 1;
+      continue;
+    }
+
+    return NaN;
+  }
+
+  const output = [];
+  const operators = [];
+  const precedence = {
+    '+': 1,
+    '-': 1,
+    '*': 2,
+    '/': 2,
+    'u+': 3,
+    'u-': 3
+  };
+  const rightAssociative = new Set(['u+', 'u-']);
+
+  let previous = null;
+
+  for (const token of tokens) {
+    if (token.type === 'number') {
+      output.push(token);
+      previous = token;
+      continue;
+    }
+
+    if (token.type === 'operator') {
+      let op = token.value;
+      const isUnary = !previous || previous.type === 'operator' || (previous.type === 'paren' && previous.value === '(');
+      if (isUnary) {
+        op = op === '-' ? 'u-' : 'u+';
+      }
+
+      while (operators.length) {
+        const top = operators[operators.length - 1];
+        if (top.type !== 'operator') {
+          break;
+        }
+        const topOp = top.value;
+        const isRight = rightAssociative.has(op);
+        if ((isRight && precedence[op] < precedence[topOp]) || (!isRight && precedence[op] <= precedence[topOp])) {
+          output.push(operators.pop());
+          continue;
+        }
+        break;
+      }
+
+      operators.push({ type: 'operator', value: op });
+      previous = { type: 'operator', value: op };
+      continue;
+    }
+
+    if (token.type === 'paren' && token.value === '(') {
+      operators.push(token);
+      previous = token;
+      continue;
+    }
+
+    if (token.type === 'paren' && token.value === ')') {
+      let matched = false;
+      while (operators.length) {
+        const top = operators.pop();
+        if (top.type === 'paren' && top.value === '(') {
+          matched = true;
+          break;
+        }
+        output.push(top);
+      }
+
+      if (!matched) {
+        return NaN;
+      }
+      previous = token;
+    }
+  }
+
+  while (operators.length) {
+    const top = operators.pop();
+    if (top.type === 'paren') {
+      return NaN;
+    }
+    output.push(top);
+  }
+
+  const stack = [];
+  for (const token of output) {
+    if (token.type === 'number') {
+      stack.push(token.value);
+      continue;
+    }
+
+    if (token.type === 'operator') {
+      if (token.value === 'u+' || token.value === 'u-') {
+        if (stack.length < 1) {
+          return NaN;
+        }
+        const value = stack.pop();
+        stack.push(token.value === 'u-' ? -value : value);
+        continue;
+      }
+
+      if (stack.length < 2) {
+        return NaN;
+      }
+      const right = stack.pop();
+      const left = stack.pop();
+
+      switch (token.value) {
+        case '+':
+          stack.push(left + right);
+          break;
+        case '-':
+          stack.push(left - right);
+          break;
+        case '*':
+          stack.push(left * right);
+          break;
+        case '/':
+          stack.push(left / right);
+          break;
+        default:
+          return NaN;
+      }
+    }
+  }
+
+  if (stack.length !== 1) {
+    return NaN;
+  }
+
+  return stack[0];
+};
+
 function App() {
   const [locale, setLocale] = React.useState('zh-CN');
   const [translations, setTranslations] = React.useState({});
@@ -87,27 +280,42 @@ function App() {
     });
   }, [locale]);
 
+  const handleAmountBlur = (value, setter) => {
+    const trimmed = value.trim();
+
+    if (trimmed === '') {
+      return;
+    }
+
+    const evaluated = evaluateExpression(trimmed);
+    if (Number.isFinite(evaluated)) {
+      setter(String(evaluated));
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setResults(null);
 
-    const parseOptionalAmount = (value) => {
-      if (value.trim() === '') {
-        return 0;
+    const parseAmount = (value, isRequired) => {
+      const trimmed = value.trim();
+
+      if (trimmed === '') {
+        return isRequired ? NaN : 0;
       }
 
-      return Number(value);
+      return evaluateExpression(trimmed);
     };
 
-    const wage = Number(annualWageIncome);
-    const bonus = parseOptionalAmount(annualOneTimeBonus);
-    const service = parseOptionalAmount(serviceRemuneration);
-    const royalty = parseOptionalAmount(royaltyFees);
-    const authors = parseOptionalAmount(authorsRemuneration);
-    const special = parseOptionalAmount(specialDeductions);
-    const additional = parseOptionalAmount(additionalSpecialDeductions);
-    const other = parseOptionalAmount(otherDeductions);
+    const wage = parseAmount(annualWageIncome, true);
+    const bonus = parseAmount(annualOneTimeBonus, false);
+    const service = parseAmount(serviceRemuneration, false);
+    const royalty = parseAmount(royaltyFees, false);
+    const authors = parseAmount(authorsRemuneration, false);
+    const special = parseAmount(specialDeductions, false);
+    const additional = parseAmount(additionalSpecialDeductions, false);
+    const other = parseAmount(otherDeductions, false);
 
     const values = [wage, bonus, service, royalty, authors, special, additional, other];
 
@@ -264,90 +472,90 @@ function App() {
             <label className="field">
               <span>{tt('wageLabel')}</span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={annualWageIncome}
                 placeholder={tt('wagePlaceholder')}
                 onChange={(event) => setAnnualWageIncome(event.target.value)}
+                onBlur={(event) => handleAmountBlur(event.target.value, setAnnualWageIncome)}
                 required
               />
             </label>
             <label className="field">
               <span>{tt('bonusLabel')}</span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={annualOneTimeBonus}
                 placeholder={tt('bonusPlaceholder')}
                 onChange={(event) => setAnnualOneTimeBonus(event.target.value)}
+                onBlur={(event) => handleAmountBlur(event.target.value, setAnnualOneTimeBonus)}
               />
             </label>
             <label className="field">
               <span>{tt('serviceRemunerationLabel')}</span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={serviceRemuneration}
                 placeholder={tt('serviceRemunerationPlaceholder')}
                 onChange={(event) => setServiceRemuneration(event.target.value)}
+                onBlur={(event) => handleAmountBlur(event.target.value, setServiceRemuneration)}
               />
             </label>
             <label className="field">
               <span>{tt('royaltyFeesLabel')}</span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={royaltyFees}
                 placeholder={tt('royaltyFeesPlaceholder')}
                 onChange={(event) => setRoyaltyFees(event.target.value)}
+                onBlur={(event) => handleAmountBlur(event.target.value, setRoyaltyFees)}
               />
             </label>
             <label className="field">
               <span>{tt('authorsRemunerationLabel')}</span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={authorsRemuneration}
                 placeholder={tt('authorsRemunerationPlaceholder')}
                 onChange={(event) => setAuthorsRemuneration(event.target.value)}
+                onBlur={(event) => handleAmountBlur(event.target.value, setAuthorsRemuneration)}
               />
             </label>
             <label className="field">
               <span>{tt('specialDeductionsLabel')}</span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={specialDeductions}
                 placeholder={tt('specialDeductionsPlaceholder')}
                 onChange={(event) => setSpecialDeductions(event.target.value)}
+                onBlur={(event) => handleAmountBlur(event.target.value, setSpecialDeductions)}
               />
             </label>
             <label className="field">
               <span>{tt('additionalSpecialDeductionsLabel')}</span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={additionalSpecialDeductions}
                 placeholder={tt('additionalSpecialDeductionsPlaceholder')}
                 onChange={(event) => setAdditionalSpecialDeductions(event.target.value)}
+                onBlur={(event) => handleAmountBlur(event.target.value, setAdditionalSpecialDeductions)}
               />
             </label>
             <label className="field">
               <span>{tt('otherDeductionsLabel')}</span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={otherDeductions}
                 placeholder={tt('otherDeductionsPlaceholder')}
                 onChange={(event) => setOtherDeductions(event.target.value)}
+                onBlur={(event) => handleAmountBlur(event.target.value, setOtherDeductions)}
               />
             </label>
             <button className="primary" type="submit" disabled={loading}>
