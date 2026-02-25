@@ -180,14 +180,19 @@ function App() {
   };
 
   const renderTaxItems = (items) => {
-    if (!Array.isArray(items)) {
+    if (!items) {
       return null;
     }
 
+    const itemEntries = Array.isArray(items)
+      ? items.map((item, index) => [`item-${index}`, item])
+      : Object.entries(items);
+
     return (
       <div className="items-list">
-        {items.map((item, index) => (
-          <div className="item-card" key={`${item.taxBaseAmount || 'item'}-${index}`}>
+        {itemEntries.map(([key, item], index) => (
+          <div className="item-card" key={`${item.taxBaseAmount || key}-${index}`}>
+            <div className="item-title">{tt(`item.${key}`)}</div>
             <div className="item-row">
               <span>{tt('taxBaseAmount')}</span>
               <span>{item.taxBaseAmount}</span>

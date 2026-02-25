@@ -200,6 +200,12 @@
   gap: 12px;
 }
 
+.item-title {
+  font-weight: 600;
+  color: #2b3a40;
+  font-size: 14px;
+}
+
 .item-row {
   display: flex;
   justify-content: space-between;
