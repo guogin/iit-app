@@ -35,6 +35,12 @@ function App() {
   const [i18nReady, setI18nReady] = React.useState(false);
   const [annualWageIncome, setAnnualWageIncome] = React.useState('');
   const [annualOneTimeBonus, setAnnualOneTimeBonus] = React.useState('');
+  const [serviceRemuneration, setServiceRemuneration] = React.useState('');
+  const [royaltyFees, setRoyaltyFees] = React.useState('');
+  const [authorsRemuneration, setAuthorsRemuneration] = React.useState('');
+  const [specialDeductions, setSpecialDeductions] = React.useState('');
+  const [additionalSpecialDeductions, setAdditionalSpecialDeductions] = React.useState('');
+  const [otherDeductions, setOtherDeductions] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const [results, setResults] = React.useState(null);
@@ -86,10 +92,26 @@ function App() {
     setError('');
     setResults(null);
 
-    const wage = Number(annualWageIncome);
-    const bonus = Number(annualOneTimeBonus);
+    const parseOptionalAmount = (value) => {
+      if (value.trim() === '') {
+        return 0;
+      }
 
-    if (!Number.isFinite(wage) || !Number.isFinite(bonus) || wage < 0 || bonus < 0) {
+      return Number(value);
+    };
+
+    const wage = Number(annualWageIncome);
+    const bonus = parseOptionalAmount(annualOneTimeBonus);
+    const service = parseOptionalAmount(serviceRemuneration);
+    const royalty = parseOptionalAmount(royaltyFees);
+    const authors = parseOptionalAmount(authorsRemuneration);
+    const special = parseOptionalAmount(specialDeductions);
+    const additional = parseOptionalAmount(additionalSpecialDeductions);
+    const other = parseOptionalAmount(otherDeductions);
+
+    const values = [wage, bonus, service, royalty, authors, special, additional, other];
+
+    if (annualWageIncome.trim() === '' || values.some((value) => !Number.isFinite(value) || value < 0)) {
       setError(tt('errorRequired'));
       return;
     }
@@ -104,7 +126,13 @@ function App() {
         },
         body: JSON.stringify({
           annualWageIncome: wage,
-          annualOneTimeBonus: bonus
+          annualOneTimeBonus: bonus,
+          serviceRemuneration: service,
+          royaltyFees: royalty,
+          authorsRemuneration: authors,
+          specialDeductions: special,
+          additionalSpecialDeductions: additional,
+          otherDeductions: other
         })
       });
 
@@ -208,7 +236,7 @@ function App() {
           <div className="hero-top">
             <span className="pill">IIT</span>
             <div className="language-switch">
-              <label htmlFor="language">{t.languageLabel}</label>
+              <label htmlFor="language">{tt('languageLabel')}</label>
               <select
                 id="language"
                 value={locale}
@@ -233,7 +261,7 @@ function App() {
               <input
                 type="number"
                 min="0"
-                step="1"
+                step="0.01"
                 value={annualWageIncome}
                 placeholder={tt('wagePlaceholder')}
                 onChange={(event) => setAnnualWageIncome(event.target.value)}
@@ -245,11 +273,76 @@ function App() {
               <input
                 type="number"
                 min="0"
-                step="1"
+                step="0.01"
                 value={annualOneTimeBonus}
                 placeholder={tt('bonusPlaceholder')}
                 onChange={(event) => setAnnualOneTimeBonus(event.target.value)}
-                required
+              />
+            </label>
+            <label className="field">
+              <span>{tt('serviceRemunerationLabel')}</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={serviceRemuneration}
+                placeholder={tt('serviceRemunerationPlaceholder')}
+                onChange={(event) => setServiceRemuneration(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>{tt('royaltyFeesLabel')}</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={royaltyFees}
+                placeholder={tt('royaltyFeesPlaceholder')}
+                onChange={(event) => setRoyaltyFees(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>{tt('authorsRemunerationLabel')}</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={authorsRemuneration}
+                placeholder={tt('authorsRemunerationPlaceholder')}
+                onChange={(event) => setAuthorsRemuneration(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>{tt('specialDeductionsLabel')}</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={specialDeductions}
+                placeholder={tt('specialDeductionsPlaceholder')}
+                onChange={(event) => setSpecialDeductions(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>{tt('additionalSpecialDeductionsLabel')}</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={additionalSpecialDeductions}
+                placeholder={tt('additionalSpecialDeductionsPlaceholder')}
+                onChange={(event) => setAdditionalSpecialDeductions(event.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>{tt('otherDeductionsLabel')}</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={otherDeductions}
+                placeholder={tt('otherDeductionsPlaceholder')}
+                onChange={(event) => setOtherDeductions(event.target.value)}
               />
             </label>
             <button className="primary" type="submit" disabled={loading}>
