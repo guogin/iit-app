@@ -340,7 +340,8 @@ function App() {
           authorsRemuneration: authors,
           specialDeductions: special,
           additionalSpecialDeductions: additional,
-          otherDeductions: other
+          otherDeductions: other,
+          locale
         })
       });
 
